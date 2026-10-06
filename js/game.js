@@ -6,7 +6,6 @@ const treasures = document.querySelectorAll(".treasure-hitbox");
 
 const ghost1 = document.getElementById("ghost1");
 const ghost2 = document.getElementById("ghost2");
-
 const player = document.getElementById("player");
 
 
@@ -24,7 +23,6 @@ function resumeAudio() {
 }
 
 function playCollectSound() {
-
     resumeAudio();
 
     const oscillator = audioContext.createOscillator();
@@ -56,15 +54,11 @@ function playCollectSound() {
     );
 
     oscillator.start();
-
-    oscillator.stop(
-        audioContext.currentTime + 0.3
-    );
+    oscillator.stop(audioContext.currentTime + 0.3);
 }
 
 
 function playDeathSound() {
-
     resumeAudio();
 
     const oscillator = audioContext.createOscillator();
@@ -96,15 +90,11 @@ function playDeathSound() {
     );
 
     oscillator.start();
-
-    oscillator.stop(
-        audioContext.currentTime + 0.8
-    );
+    oscillator.stop(audioContext.currentTime + 0.8);
 }
 
 
 function playWinSound() {
-
     resumeAudio();
 
     const oscillator = audioContext.createOscillator();
@@ -141,10 +131,7 @@ function playWinSound() {
     );
 
     oscillator.start();
-
-    oscillator.stop(
-        audioContext.currentTime + 0.8
-    );
+    oscillator.stop(audioContext.currentTime + 0.8);
 }
 
 
@@ -186,12 +173,10 @@ treasures.forEach((treasure) => {
             );
 
             setTimeout(() => {
-
                 parent.setAttribute(
                     "visible",
                     "false"
                 );
-
             }, 400);
         }
 
@@ -220,40 +205,79 @@ treasures.forEach((treasure) => {
 
 
 /* =========================================
-   PLAYER / WALL COLLISION
+   WALL COLLISION
 ========================================= */
-
-let solidObjects = [];
 
 const PLAYER_RADIUS = 0.45;
 
+let solidObjects = [];
+
+
+/*
+    Store the player's last safe position.
+*/
+
+let lastSafeX = null;
+let lastSafeZ = null;
+
+
+/*
+    Create collision list.
+*/
 
 function setupCollision() {
 
-    solidObjects =
-        Array.from(
-            document.querySelectorAll(".solid")
-        );
+    solidObjects = Array.from(
+        document.querySelectorAll(".solid")
+    );
 
     console.log(
-        "🧱 Solid objects:",
+        "🧱 COLLISION OBJECTS:",
         solidObjects.length
     );
+
+    solidObjects.forEach((object, index) => {
+
+        console.log(
+            index,
+            object.id || object.tagName,
+            object.getAttribute("position")
+        );
+
+    });
 }
 
 
-function checkCollision(x, z) {
+/*
+    Get the world-space bounding box
+    of an object.
+*/
+
+function getObjectBox(object) {
+
+    if (!object || !object.object3D) {
+        return null;
+    }
+
+    const box = new THREE.Box3();
+
+    box.setFromObject(
+        object.object3D
+    );
+
+    return box;
+}
+
+
+/*
+    Check player against all solid objects.
+*/
+
+function isColliding(x, z) {
 
     if (!player) {
         return false;
     }
-
-    const playerPosition =
-        new THREE.Vector3(
-            x,
-            player.object3D.position.y,
-            z
-        );
 
 
     for (const object of solidObjects) {
@@ -264,23 +288,37 @@ function checkCollision(x, z) {
 
 
         const box =
-            new THREE.Box3().setFromObject(
-                object.object3D
-            );
+            getObjectBox(object);
 
 
-        box.min.x -= PLAYER_RADIUS;
-        box.max.x += PLAYER_RADIUS;
+        if (!box) {
+            continue;
+        }
 
-        box.min.z -= PLAYER_RADIUS;
-        box.max.z += PLAYER_RADIUS;
+
+        /*
+            Expand collision box around
+            the player.
+        */
+
+        const minX =
+            box.min.x - PLAYER_RADIUS;
+
+        const maxX =
+            box.max.x + PLAYER_RADIUS;
+
+        const minZ =
+            box.min.z - PLAYER_RADIUS;
+
+        const maxZ =
+            box.max.z + PLAYER_RADIUS;
 
 
         if (
-            playerPosition.x >= box.min.x &&
-            playerPosition.x <= box.max.x &&
-            playerPosition.z >= box.min.z &&
-            playerPosition.z <= box.max.z
+            x >= minX &&
+            x <= maxX &&
+            z >= minZ &&
+            z <= maxZ
         ) {
 
             return true;
@@ -292,7 +330,11 @@ function checkCollision(x, z) {
 }
 
 
-function handlePlayerCollision() {
+/*
+    PLAYER COLLISION LOOP
+*/
+
+function updatePlayerCollision() {
 
     if (!player || gameOver) {
         return;
@@ -307,62 +349,89 @@ function handlePlayerCollision() {
     const currentZ = position.z;
 
 
+    /*
+        Initialize safe position.
+    */
+
     if (
-        typeof handlePlayerCollision.lastX !==
-        "number"
+        lastSafeX === null ||
+        lastSafeZ === null
     ) {
 
-        handlePlayerCollision.lastX =
-            currentX;
-
-        handlePlayerCollision.lastZ =
-            currentZ;
+        lastSafeX = currentX;
+        lastSafeZ = currentZ;
 
         return;
     }
 
 
-    const oldX =
-        handlePlayerCollision.lastX;
-
-    const oldZ =
-        handlePlayerCollision.lastZ;
-
-
-    /* Check X movement */
+    /*
+        Check entire current position.
+    */
 
     if (
-        checkCollision(
+        isColliding(
             currentX,
-            oldZ
-        )
-    ) {
-
-        position.x = oldX;
-
-    } else {
-
-        handlePlayerCollision.lastX =
-            currentX;
-    }
-
-
-    /* Check Z movement */
-
-    if (
-        checkCollision(
-            position.x,
             currentZ
         )
     ) {
 
-        position.z = oldZ;
+        /*
+            Try keeping X but restoring Z.
+        */
 
-    } else {
+        if (
+            !isColliding(
+                currentX,
+                lastSafeZ
+            )
+        ) {
 
-        handlePlayerCollision.lastZ =
-            currentZ;
+            position.z = lastSafeZ;
+
+            lastSafeX = currentX;
+
+            return;
+        }
+
+
+        /*
+            Try keeping Z but restoring X.
+        */
+
+        if (
+            !isColliding(
+                lastSafeX,
+                currentZ
+            )
+        ) {
+
+            position.x = lastSafeX;
+
+            lastSafeZ = currentZ;
+
+            return;
+        }
+
+
+        /*
+            Both directions collide.
+            Restore completely.
+        */
+
+        position.x = lastSafeX;
+        position.z = lastSafeZ;
+
+        return;
     }
+
+
+    /*
+        Position is safe.
+    */
+
+    lastSafeX = currentX;
+    lastSafeZ = currentZ;
 }
 
 
@@ -370,26 +439,13 @@ function handlePlayerCollision() {
    GHOST AI
 ========================================= */
 
-/*
-    Ghosts do NOT chase immediately.
-
-    Player gets 5 seconds of safety after spawn.
-*/
-
 const GHOST_START_DELAY = 5000;
-
-const GHOST_DETECTION_RANGE = 12;
-
-const GHOST_SPEED = 3.5;
+const GHOST_DETECTION_RANGE = 8;
+const GHOST_SPEED = 1.8;
 
 let ghostAIActive = false;
-
 let ghostTime = 0;
 
-
-/*
-    Activate ghost AI after 5 seconds.
-*/
 
 setTimeout(() => {
 
@@ -398,16 +454,16 @@ setTimeout(() => {
         ghostAIActive = true;
 
         console.log(
-            "👻 Ghosts are now hunting!"
+            "👻 GHOSTS ARE NOW HUNTING"
         );
     }
 
 }, GHOST_START_DELAY);
 
 
-/* =========================================
-   UPDATE ONE GHOST
-========================================= */
+/*
+    Update individual ghost.
+*/
 
 function updateGhost(
     ghost,
@@ -438,9 +494,9 @@ function updateGhost(
         );
 
 
-    /* =====================================
-       CHASE MODE
-    ===================================== */
+    /*
+        CHASE
+    */
 
     if (
         ghostAIActive &&
@@ -474,10 +530,6 @@ function updateGhost(
                 directionZ * movement;
 
 
-            /*
-                Face the player.
-            */
-
             ghost.object3D.rotation.y =
                 Math.atan2(
                     directionX,
@@ -485,10 +537,6 @@ function updateGhost(
                 );
         }
 
-
-        /*
-            Chasing floating animation.
-        */
 
         ghostPos.y =
             1.5 +
@@ -502,16 +550,11 @@ function updateGhost(
     }
 
 
-    /* =====================================
-       NORMAL PATROL
-    ===================================== */
+    /*
+        PATROL
+    */
 
     if (ghostIndex === 0) {
-
-        /*
-            Ghost 1 stays around the
-            middle of the dungeon.
-        */
 
         ghostPos.x =
             Math.sin(
@@ -525,10 +568,6 @@ function updateGhost(
             ) * 10;
 
     } else {
-
-        /*
-            Ghost 2 has a different patrol.
-        */
 
         ghostPos.x =
             -10 +
@@ -553,9 +592,9 @@ function updateGhost(
 }
 
 
-/* =========================================
-   GHOST MOVEMENT LOOP
-========================================= */
+/*
+    Ghost animation loop.
+*/
 
 function moveGhosts(time) {
 
@@ -614,8 +653,6 @@ function checkGhostCollision() {
         );
 
 
-    /* Ghost 1 */
-
     if (ghost1) {
 
         const ghostPos =
@@ -637,8 +674,6 @@ function checkGhostCollision() {
         }
     }
 
-
-    /* Ghost 2 */
 
     if (ghost2) {
 
@@ -675,7 +710,6 @@ function killPlayer() {
 
 
     gameOver = true;
-
     ghostAIActive = false;
 
 
@@ -821,7 +855,7 @@ function killPlayer() {
 
 
 /* =========================================
-   TORCH LIGHT FLICKER
+   TORCH LIGHT
 ========================================= */
 
 const torchLight =
@@ -851,14 +885,14 @@ function flickerTorch() {
 
 
 /* =========================================
-   MAIN GAME LOOP
+   MAIN LOOP
 ========================================= */
 
 function gameLoop() {
 
     if (!gameOver) {
 
-        handlePlayerCollision();
+        updatePlayerCollision();
 
     }
 
@@ -898,15 +932,25 @@ function startGame() {
     );
 
 
-    /*
-        Setup wall collision.
-    */
-
     setupCollision();
 
 
     /*
-        Start player collision.
+        Save initial spawn position.
+    */
+
+    if (player) {
+
+        lastSafeX =
+            player.object3D.position.x;
+
+        lastSafeZ =
+            player.object3D.position.z;
+    }
+
+
+    /*
+        Start collision.
     */
 
     requestAnimationFrame(
@@ -915,7 +959,7 @@ function startGame() {
 
 
     /*
-        Start ghost movement.
+        Start ghosts.
     */
 
     requestAnimationFrame(
@@ -924,7 +968,7 @@ function startGame() {
 
 
     /*
-        Start torch flickering.
+        Start torch.
     */
 
     flickerTorch();
@@ -932,7 +976,7 @@ function startGame() {
 
 
 /* =========================================
-   WAIT FOR A-FRAME
+   WAIT FOR SCENE
 ========================================= */
 
 if (
