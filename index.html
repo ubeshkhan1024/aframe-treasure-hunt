@@ -98,94 +98,172 @@
                 acceleration: 35;
                 fly: false;
             "
+        ><!-- TORCH IN PLAYER'S HAND -->
+        <a-entity
+            id="handTorch"
+            position="0.48 -0.42 -0.75"
+            rotation="-12 -8 8"
         >
 
-            <a-cursor
-                raycaster="
-                    objects: .treasure-hitbox;
-                    far: 30;
+            <!-- Wooden handle -->
+            <a-cylinder
+                position="0 0 0"
+                radius="0.045"
+                height="0.55"
+                color="#4a2818"
+                material="roughness: 1"
+            ></a-cylinder>
+
+            <!-- Metal torch head -->
+            <a-cylinder
+                position="0 0.30 0"
+                radius="0.085"
+                height="0.12"
+                color="#444"
+                material="metalness: 0.7; roughness: 0.35"
+            ></a-cylinder>
+
+            <!-- Flame -->
+            <a-cone
+                position="0 0.48 0"
+                radius-bottom="0.12"
+                radius-top="0.025"
+                height="0.30"
+                color="#ff7a00"
+                material="
+                    emissive: #ff3300;
+                    emissiveIntensity: 2;
+                    shader: standard;
                 "
-                fuse="false"
-                color="#ffffff"
-                geometry="
-                    primitive: ring;
-                    radiusInner: 0.008;
-                    radiusOuter: 0.014;
+                animation="
+                    property: scale;
+                    dir: alternate;
+                    dur: 120;
+                    easing: easeInOutSine;
+                    loop: true;
+                    to: 0.85 1.15 0.85;
                 "
-            >
-            </a-cursor>
+            ></a-cone>
 
-        </a-camera>
+            <!-- Inner flame -->
+            <a-cone
+                position="0 0.50 0"
+                radius-bottom="0.055"
+                radius-top="0"
+                height="0.20"
+                color="#fff3a0"
+                material="
+                    emissive: #ffcc33;
+                    emissiveIntensity: 3;
+                "
+                animation="
+                    property: rotation;
+                    dir: alternate;
+                    dur: 90;
+                    easing: easeInOutSine;
+                    loop: true;
+                    to: 0 8 0;
+                "
+            ></a-cone>
 
+            <!-- Torch light -->
+            <a-light
+                id="torchLight"
+                type="point"
+                color="#ff9d45"
+                intensity="5"
+                distance="8"
+                decay="1.5"
+            ></a-light>
 
-        <!-- ===================================== -->
-        <!-- LIGHTING -->
-        <!-- ===================================== -->
+        </a-entity>
 
-        <a-light
-            type="ambient"
-            color="#303040"
-            intensity="0.7"
-        >
-        </a-light>
+                    <a-cursor
+                        raycaster="
+                            objects: .treasure-hitbox;
+                            far: 30;
+                        "
+                        fuse="false"
+                        color="#ffffff"
+                        geometry="
+                            primitive: ring;
+                            radiusInner: 0.008;
+                            radiusOuter: 0.014;
+                        "
+                    >
+                    </a-cursor>
 
-
-        <a-light
-            type="point"
-            position="0 5 0"
-            color="#ff8a32"
-            intensity="2"
-            distance="18"
-        >
-        </a-light>
-
-
-        <a-light
-            type="point"
-            position="-15 3 -15"
-            color="#ff4422"
-            intensity="1.5"
-            distance="10"
-        >
-        </a-light>
-
-
-        <a-light
-            type="point"
-            position="15 3 -15"
-            color="#00aaff"
-            intensity="1.5"
-            distance="10"
-        >
-        </a-light>
-
-
-        <a-light
-            type="point"
-            position="15 3 15"
-            color="#ff2244"
-            intensity="1.5"
-            distance="10"
-        >
-        </a-light>
+                </a-camera>
 
 
-        <!-- ===================================== -->
-        <!-- FLOOR -->
-        <!-- ===================================== -->
+                <!-- ===================================== -->
+                <!-- LIGHTING -->
+                <!-- ===================================== -->
 
-        <a-plane
-            position="0 0 0"
-            rotation="-90 0 0"
-            width="48"
-            height="48"
-            material="
-                color: #25221f;
-                roughness: 1;
-                metalness: 0;
-            "
-        >
-        </a-plane>
+                <a-light
+                    type="ambient"
+                    color="#303040"
+                    intensity="0.7"
+                >
+                </a-light>
+
+
+                <a-light
+                    type="point"
+                    position="0 5 0"
+                    color="#ff8a32"
+                    intensity="2"
+                    distance="18"
+                >
+                </a-light>
+
+
+                <a-light
+                    type="point"
+                    position="-15 3 -15"
+                    color="#ff4422"
+                    intensity="1.5"
+                    distance="10"
+                >
+                </a-light>
+
+
+                <a-light
+                    type="point"
+                    position="15 3 -15"
+                    color="#00aaff"
+                    intensity="1.5"
+                    distance="10"
+                >
+                </a-light>
+
+
+                <a-light
+                    type="point"
+                    position="15 3 15"
+                    color="#ff2244"
+                    intensity="1.5"
+                    distance="10"
+                >
+                </a-light>
+
+
+                <!-- ===================================== -->
+                <!-- FLOOR -->
+                <!-- ===================================== -->
+
+                <a-plane
+                    position="0 0 0"
+                    rotation="-90 0 0"
+                    width="48"
+                    height="48"
+                    material="
+                        color: #25221f;
+                        roughness: 1;
+                        metalness: 0;
+                    "
+                >
+                </a-plane>
 
 
         <!-- ===================================== -->
@@ -246,6 +324,16 @@
             "
         >
         </a-box>
+        <!-- ROOF / CEILING -->
+        <a-box
+             position="0 4.2 0"
+             width="48"
+             height="0.6"
+             depth="48"
+             color="#101016"
+             material="roughness: 1; metalness: 0"
+>
+    </a-box>
 
 
         <!-- ===================================== -->

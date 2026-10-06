@@ -1,27 +1,18 @@
-// ============================================
-// HAUNTED TREASURE HUNT - GAME.JS
-// ============================================
-
 let found = 0;
 let gameOver = false;
 
 const counter = document.getElementById("counter");
-
-// IMPORTANT:
-// Your new HTML uses .treasure-hitbox
 const treasures = document.querySelectorAll(".treasure-hitbox");
 
-// Ghosts
 const ghost1 = document.getElementById("ghost1");
 const ghost2 = document.getElementById("ghost2");
 
-// Player camera
 const player = document.getElementById("player");
 
 
-// ============================================
-// AUDIO
-// ============================================
+/* =========================================
+   AUDIO
+========================================= */
 
 const audioContext =
     new (window.AudioContext || window.webkitAudioContext)();
@@ -31,11 +22,6 @@ function resumeAudio() {
         audioContext.resume();
     }
 }
-
-
-// ============================================
-// COLLECT SOUND
-// ============================================
 
 function playCollectSound() {
 
@@ -77,10 +63,6 @@ function playCollectSound() {
 }
 
 
-// ============================================
-// DEATH SOUND
-// ============================================
-
 function playDeathSound() {
 
     resumeAudio();
@@ -120,10 +102,6 @@ function playDeathSound() {
     );
 }
 
-
-// ============================================
-// WIN SOUND
-// ============================================
 
 function playWinSound() {
 
@@ -170,9 +148,9 @@ function playWinSound() {
 }
 
 
-// ============================================
-// TREASURE COLLECTION
-// ============================================
+/* =========================================
+   TREASURE SYSTEM
+========================================= */
 
 treasures.forEach((treasure) => {
 
@@ -180,31 +158,26 @@ treasures.forEach((treasure) => {
 
         if (gameOver) return;
 
-        console.log("TREASURE CLICKED");
-
-        // Already collected?
         if (
             treasure.getAttribute("data-found") === "true"
         ) {
             return;
         }
 
+        console.log("💰 TREASURE CLICKED");
+
         treasure.setAttribute(
             "data-found",
             "true"
         );
 
-        // Increase count
         found++;
 
-        // Sound
         playCollectSound();
 
-        // Find parent treasure
         const parent =
             treasure.closest(".treasure");
 
-        // Hide treasure
         if (parent) {
 
             parent.setAttribute(
@@ -222,11 +195,10 @@ treasures.forEach((treasure) => {
             }, 400);
         }
 
-        // Update HUD
         counter.innerText =
             `Treasures: ${found} / 3`;
 
-        // Win
+
         if (found === 3) {
 
             setTimeout(() => {
@@ -241,107 +213,360 @@ treasures.forEach((treasure) => {
 
             }, 600);
         }
+
     });
+
 });
 
 
-// ============================================
-// GHOST MOVEMENT
-// ============================================
+/* =========================================
+   PLAYER / WALL COLLISION
+========================================= */
 
-let ghostTime = 0;
+let solidObjects = [];
 
-function moveGhosts(time) {
-
-    if (gameOver) {
-        requestAnimationFrame(moveGhosts);
-        return;
-    }
-
-    ghostTime = time * 0.001;
+const PLAYER_RADIUS = 0.45;
 
 
-    // ----------------------------------------
-    // GHOST 1
-    // Large circular roaming area
-    // ----------------------------------------
+function setupCollision() {
 
-    if (ghost1) {
-
-        const x1 =
-            0 +
-            Math.sin(ghostTime * 0.45) * 9;
-
-        const z1 =
-            -6 +
-            Math.cos(ghostTime * 0.45) * 9;
-
-        const y1 =
-            1.5 +
-            Math.sin(ghostTime * 2) * 0.45;
-
-        ghost1.object3D.position.set(
-            x1,
-            y1,
-            z1
+    solidObjects =
+        Array.from(
+            document.querySelectorAll(".solid")
         );
 
-        // Make ghost face movement direction
-        ghost1.object3D.rotation.y =
-            Math.atan2(
-                Math.cos(ghostTime * 0.45),
-                -Math.sin(ghostTime * 0.45)
-            );
-    }
-
-
-    // ----------------------------------------
-    // GHOST 2
-    // Different roaming path
-    // ----------------------------------------
-
-    if (ghost2) {
-
-        const x2 =
-            -6 +
-            Math.sin(ghostTime * 0.65) * 12;
-
-        const z2 =
-            -2 +
-            Math.cos(ghostTime * 0.65) * 7;
-
-        const y2 =
-            1.5 +
-            Math.sin(ghostTime * 1.7) * 0.55;
-
-        ghost2.object3D.position.set(
-            x2,
-            y2,
-            z2
-        );
-
-        ghost2.object3D.rotation.y =
-            Math.atan2(
-                Math.cos(ghostTime * 0.65),
-                -Math.sin(ghostTime * 0.65)
-            );
-    }
-
-
-    // Check if ghost touched player
-    checkGhostCollision();
-
-    requestAnimationFrame(moveGhosts);
+    console.log(
+        "🧱 Solid objects:",
+        solidObjects.length
+    );
 }
 
 
-// ============================================
-// GHOST VS PLAYER
-// ============================================
+function checkCollision(x, z) {
 
-function checkGhostCollision() {
+    if (!player) {
+        return false;
+    }
 
-    if (!player || gameOver) return;
+    const playerPosition =
+        new THREE.Vector3(
+            x,
+            player.object3D.position.y,
+            z
+        );
+
+
+    for (const object of solidObjects) {
+
+        if (!object.object3D.visible) {
+            continue;
+        }
+
+
+        const box =
+            new THREE.Box3().setFromObject(
+                object.object3D
+            );
+
+
+        box.min.x -= PLAYER_RADIUS;
+        box.max.x += PLAYER_RADIUS;
+
+        box.min.z -= PLAYER_RADIUS;
+        box.max.z += PLAYER_RADIUS;
+
+
+        if (
+            playerPosition.x >= box.min.x &&
+            playerPosition.x <= box.max.x &&
+            playerPosition.z >= box.min.z &&
+            playerPosition.z <= box.max.z
+        ) {
+
+            return true;
+        }
+    }
+
+
+    return false;
+}
+
+
+function handlePlayerCollision() {
+
+    if (!player || gameOver) {
+        return;
+    }
+
+
+    const position =
+        player.object3D.position;
+
+
+    const currentX = position.x;
+    const currentZ = position.z;
+
+
+    if (
+        typeof handlePlayerCollision.lastX !==
+        "number"
+    ) {
+
+        handlePlayerCollision.lastX =
+            currentX;
+
+        handlePlayerCollision.lastZ =
+            currentZ;
+
+        return;
+    }
+
+
+    const oldX =
+        handlePlayerCollision.lastX;
+
+    const oldZ =
+        handlePlayerCollision.lastZ;
+
+
+    /* Check X movement */
+
+    if (
+        checkCollision(
+            currentX,
+            oldZ
+        )
+    ) {
+
+        position.x = oldX;
+
+    } else {
+
+        handlePlayerCollision.lastX =
+            currentX;
+    }
+
+
+    /* Check Z movement */
+
+    if (
+        checkCollision(
+            position.x,
+            currentZ
+        )
+    ) {
+
+        position.z = oldZ;
+
+    } else {
+
+        handlePlayerCollision.lastZ =
+            currentZ;
+    }
+}
+
+
+/* =========================================
+   GHOST AI
+========================================= */
+
+/*
+    Ghosts do NOT chase immediately.
+
+    Player gets 5 seconds of safety after spawn.
+*/
+
+const GHOST_START_DELAY = 5000;
+
+const GHOST_DETECTION_RANGE = 12;
+
+const GHOST_SPEED = 3.5;
+
+let ghostAIActive = false;
+
+let ghostTime = 0;
+
+
+/*
+    Activate ghost AI after 5 seconds.
+*/
+
+setTimeout(() => {
+
+    if (!gameOver) {
+
+        ghostAIActive = true;
+
+        console.log(
+            "👻 Ghosts are now hunting!"
+        );
+    }
+
+}, GHOST_START_DELAY);
+
+
+/* =========================================
+   UPDATE ONE GHOST
+========================================= */
+
+function updateGhost(
+    ghost,
+    playerPos,
+    ghostIndex
+) {
+
+    if (!ghost) {
+        return;
+    }
+
+
+    const ghostPos =
+        ghost.object3D.position;
+
+
+    const dx =
+        playerPos.x - ghostPos.x;
+
+    const dz =
+        playerPos.z - ghostPos.z;
+
+
+    const distance =
+        Math.sqrt(
+            dx * dx +
+            dz * dz
+        );
+
+
+    /* =====================================
+       CHASE MODE
+    ===================================== */
+
+    if (
+        ghostAIActive &&
+        distance <= GHOST_DETECTION_RANGE
+    ) {
+
+        const length =
+            Math.sqrt(
+                dx * dx +
+                dz * dz
+            );
+
+
+        if (length > 0.01) {
+
+            const directionX =
+                dx / length;
+
+            const directionZ =
+                dz / length;
+
+
+            const movement =
+                GHOST_SPEED * 0.016;
+
+
+            ghostPos.x +=
+                directionX * movement;
+
+            ghostPos.z +=
+                directionZ * movement;
+
+
+            /*
+                Face the player.
+            */
+
+            ghost.object3D.rotation.y =
+                Math.atan2(
+                    directionX,
+                    directionZ
+                );
+        }
+
+
+        /*
+            Chasing floating animation.
+        */
+
+        ghostPos.y =
+            1.5 +
+            Math.sin(
+                ghostTime * 4 +
+                ghostIndex
+            ) * 0.35;
+
+
+        return;
+    }
+
+
+    /* =====================================
+       NORMAL PATROL
+    ===================================== */
+
+    if (ghostIndex === 0) {
+
+        /*
+            Ghost 1 stays around the
+            middle of the dungeon.
+        */
+
+        ghostPos.x =
+            Math.sin(
+                ghostTime * 0.35
+            ) * 10;
+
+        ghostPos.z =
+            -8 +
+            Math.cos(
+                ghostTime * 0.35
+            ) * 10;
+
+    } else {
+
+        /*
+            Ghost 2 has a different patrol.
+        */
+
+        ghostPos.x =
+            -10 +
+            Math.sin(
+                ghostTime * 0.45
+            ) * 8;
+
+        ghostPos.z =
+            -8 +
+            Math.cos(
+                ghostTime * 0.45
+            ) * 8;
+    }
+
+
+    ghostPos.y =
+        1.5 +
+        Math.sin(
+            ghostTime * 2 +
+            ghostIndex
+        ) * 0.45;
+}
+
+
+/* =========================================
+   GHOST MOVEMENT LOOP
+========================================= */
+
+function moveGhosts(time) {
+
+    ghostTime =
+        time * 0.001;
+
+
+    if (!player || gameOver) {
+        return;
+    }
+
 
     const playerPos =
         player.object3D.getWorldPosition(
@@ -349,61 +574,119 @@ function checkGhostCollision() {
         );
 
 
-    // Ghost 1 collision
+    updateGhost(
+        ghost1,
+        playerPos,
+        0
+    );
+
+
+    updateGhost(
+        ghost2,
+        playerPos,
+        1
+    );
+
+
+    checkGhostCollision();
+
+
+    requestAnimationFrame(
+        moveGhosts
+    );
+}
+
+
+/* =========================================
+   GHOST COLLISION
+========================================= */
+
+function checkGhostCollision() {
+
+    if (!player || gameOver) {
+        return;
+    }
+
+
+    const playerPos =
+        player.object3D.getWorldPosition(
+            new THREE.Vector3()
+        );
+
+
+    /* Ghost 1 */
+
     if (ghost1) {
 
-        const ghostPos1 =
+        const ghostPos =
             ghost1.object3D.getWorldPosition(
                 new THREE.Vector3()
             );
 
-        const distance1 =
-            playerPos.distanceTo(ghostPos1);
+        const distance =
+            playerPos.distanceTo(
+                ghostPos
+            );
 
-        if (distance1 < 2.0) {
+
+        if (distance < 2.2) {
 
             killPlayer();
+
             return;
         }
     }
 
 
-    // Ghost 2 collision
+    /* Ghost 2 */
+
     if (ghost2) {
 
-        const ghostPos2 =
+        const ghostPos =
             ghost2.object3D.getWorldPosition(
                 new THREE.Vector3()
             );
 
-        const distance2 =
-            playerPos.distanceTo(ghostPos2);
+        const distance =
+            playerPos.distanceTo(
+                ghostPos
+            );
 
-        if (distance2 < 2.0) {
+
+        if (distance < 2.2) {
 
             killPlayer();
+
             return;
         }
     }
 }
 
 
-// ============================================
-// PLAYER DEATH
-// ============================================
+/* =========================================
+   PLAYER DEATH
+========================================= */
 
 function killPlayer() {
 
-    if (gameOver) return;
+    if (gameOver) {
+        return;
+    }
+
 
     gameOver = true;
 
-    console.log("PLAYER KILLED BY GHOST");
+    ghostAIActive = false;
+
+
+    console.log(
+        "💀 PLAYER KILLED"
+    );
+
 
     playDeathSound();
 
 
-    // Stop player movement
     if (player) {
 
         player.setAttribute(
@@ -413,19 +696,27 @@ function killPlayer() {
     }
 
 
-    // Create death screen
     const deathScreen =
         document.createElement("div");
 
-    deathScreen.id = "deathScreen";
+
+    deathScreen.id =
+        "deathScreen";
+
 
     deathScreen.innerHTML = `
         <div class="deathBox">
+
             <h1>💀 YOU DIED</h1>
-            <p>A ghost caught you...</p>
+
+            <p>
+                A ghost caught you...
+            </p>
+
             <button onclick="location.reload()">
                 TRY AGAIN
             </button>
+
         </div>
     `;
 
@@ -434,93 +725,226 @@ function killPlayer() {
         position: fixed;
         inset: 0;
         z-index: 10000;
+
         display: flex;
         justify-content: center;
         align-items: center;
+
         text-align: center;
-        background: rgba(0, 0, 0, 0.94);
+
+        background: rgba(0,0,0,0.94);
+
         color: white;
+
         font-family: Arial, sans-serif;
     `;
 
 
-    deathScreen
-        .querySelector(".deathBox")
-        .style.cssText = `
-            padding: 45px;
-            min-width: 320px;
-            background: #15151d;
-            border: 2px solid #ff2222;
-            border-radius: 20px;
-            box-shadow:
-                0 0 35px rgba(255, 0, 0, 0.4),
-                inset 0 0 30px rgba(255, 0, 0, 0.05);
-        `;
+    const box =
+        deathScreen.querySelector(
+            ".deathBox"
+        );
 
 
-    deathScreen
-        .querySelector("h1")
-        .style.cssText = `
-            color: #ff3333;
-            font-size: 44px;
-            margin-bottom: 15px;
-        `;
+    box.style.cssText = `
+        padding: 45px;
+
+        min-width: 320px;
+
+        background: #15151d;
+
+        border: 2px solid #ff2222;
+
+        border-radius: 20px;
+
+        box-shadow:
+            0 0 35px rgba(255,0,0,0.4),
+            inset 0 0 30px rgba(255,0,0,0.05);
+    `;
 
 
-    deathScreen
-        .querySelector("p")
-        .style.cssText = `
-            color: #bbb;
-            font-size: 18px;
-            margin-bottom: 25px;
-        `;
+    const title =
+        deathScreen.querySelector("h1");
 
 
-    deathScreen
-        .querySelector("button")
-        .style.cssText = `
-            padding: 14px 30px;
-            border: none;
-            border-radius: 10px;
-            background: #ff3333;
-            color: white;
-            font-size: 18px;
-            font-weight: bold;
-            cursor: pointer;
-        `;
+    title.style.cssText = `
+        color: #ff3333;
+
+        font-size: 44px;
+
+        margin-bottom: 15px;
+    `;
 
 
-    document.body.appendChild(deathScreen);
+    const text =
+        deathScreen.querySelector("p");
+
+
+    text.style.cssText = `
+        color: #bbb;
+
+        font-size: 18px;
+
+        margin-bottom: 25px;
+    `;
+
+
+    const button =
+        deathScreen.querySelector(
+            "button"
+        );
+
+
+    button.style.cssText = `
+        padding: 14px 30px;
+
+        border: none;
+
+        border-radius: 10px;
+
+        background: #ff3333;
+
+        color: white;
+
+        font-size: 18px;
+
+        font-weight: bold;
+
+        cursor: pointer;
+    `;
+
+
+    document.body.appendChild(
+        deathScreen
+    );
 }
 
 
-// ============================================
-// START GHOST SYSTEM
-// ============================================
+/* =========================================
+   TORCH LIGHT FLICKER
+========================================= */
 
-function startGameSystems() {
+const torchLight =
+    document.getElementById("torchLight");
 
-    console.log("=================================");
-    console.log("HAUNTED TREASURE HUNT STARTED");
-    console.log("Treasures:", treasures.length);
-    console.log("Ghost 1:", ghost1 ? "FOUND" : "MISSING");
-    console.log("Ghost 2:", ghost2 ? "FOUND" : "MISSING");
-    console.log("Player:", player ? "FOUND" : "MISSING");
-    console.log("=================================");
 
-    requestAnimationFrame(moveGhosts);
+function flickerTorch() {
+
+    if (torchLight) {
+
+        const intensity =
+            4.5 +
+            Math.random() * 2.0;
+
+        torchLight.setAttribute(
+            "intensity",
+            intensity
+        );
+    }
+
+
+    setTimeout(
+        flickerTorch,
+        80 + Math.random() * 120
+    );
 }
 
 
-// Wait until A-Frame has loaded
-if (document.readyState === "loading") {
+/* =========================================
+   MAIN GAME LOOP
+========================================= */
+
+function gameLoop() {
+
+    if (!gameOver) {
+
+        handlePlayerCollision();
+
+    }
+
+
+    requestAnimationFrame(
+        gameLoop
+    );
+}
+
+
+/* =========================================
+   START GAME
+========================================= */
+
+function startGame() {
+
+    console.log(
+        "👻 Haunted Treasure Hunt started"
+    );
+
+
+    console.log(
+        "💰 Treasures:",
+        treasures.length
+    );
+
+
+    console.log(
+        "👻 Ghost 1:",
+        ghost1 ? "FOUND" : "MISSING"
+    );
+
+
+    console.log(
+        "👻 Ghost 2:",
+        ghost2 ? "FOUND" : "MISSING"
+    );
+
+
+    /*
+        Setup wall collision.
+    */
+
+    setupCollision();
+
+
+    /*
+        Start player collision.
+    */
+
+    requestAnimationFrame(
+        gameLoop
+    );
+
+
+    /*
+        Start ghost movement.
+    */
+
+    requestAnimationFrame(
+        moveGhosts
+    );
+
+
+    /*
+        Start torch flickering.
+    */
+
+    flickerTorch();
+}
+
+
+/* =========================================
+   WAIT FOR A-FRAME
+========================================= */
+
+if (
+    document.readyState === "loading"
+) {
 
     document.addEventListener(
         "DOMContentLoaded",
-        startGameSystems
+        startGame
     );
 
 } else {
 
-    startGameSystems();
+    startGame();
 }
